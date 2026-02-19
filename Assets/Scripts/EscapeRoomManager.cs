@@ -1,8 +1,12 @@
 using UnityEngine;
 using TMPro;
+using System.Collections;
 
 public class EscapeRoomManager : MonoBehaviour
 {
+
+    public TeleportWin teleportWin; //Aniketh code
+
     [Header("UI Elements")]
     [Tooltip("Text displaying progress (e.g. 'Systems Restored: 1/3')")]
     public TextMeshProUGUI scoreboardText;
@@ -112,6 +116,14 @@ public class EscapeRoomManager : MonoBehaviour
         {
             if (obj != null) obj.SetActive(false);
         }
+
+        //teleportWin.teleportToBird(); // Aniketh Code below
+        StartCoroutine(WaitThenTeleport(2f));
+    }
+
+    IEnumerator WaitThenTeleport(float delay) {
+        yield return new WaitForSeconds(delay);
+        teleportWin.teleportToBird();
     }
 
     void GameLost()

@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using UnityEngine.XR.Interaction.Toolkit.Filtering;
 
 public class GateSocket : MonoBehaviour
 {
@@ -20,60 +21,81 @@ public class GateSocket : MonoBehaviour
     void Start()
     {
         socketInteractor = GetComponent<XRSocketInteractor>();
+
+        // Filter: only allow the correct clue to be socketed
+        socketInteractor.startingSelectedInteractable = null;
         socketInteractor.selectEntered.AddListener(OnObjectPlaced);
-        socketInteractor.selectExited.AddListener(OnObjectRemoved);
+    }
+
+    // Called by XRI before allowing a hover — reject wrong objects early
+    public bool CanSocketAccept(IXRInteractable interactable)
+    {
+        if (isUnlocked) return false;
+        return interactable.transform.gameObject == acceptedClue;
+    }
+
+    void OnEnable()
+    {
+        // Wait a frame so socketInteractor is ready
+        StartCoroutine(RegisterFilter());
+    }
+
+    System.Collections.IEnumerator RegisterFilter()
+    {
+        yield return null;
+        if (socketInteractor == null)
+            socketInteractor = GetComponent<XRSocketInteractor>();
+
+        // Use hover/select filters to block wrong objects entirely
+        socketInteractor.hoverFilters.Add(new XRSocketFilter(this));
+        socketInteractor.selectFilters.Add(new XRSocketFilter(this));
     }
 
     void OnObjectPlaced(SelectEnterEventArgs args)
     {
-        // Check if the placed object is the correct clue
+        // Double-check (filter should prevent this, but just in case)
         if (args.interactableObject.transform.gameObject != acceptedClue)
-        {
-            // Wrong object — eject it by deselecting
-            StartCoroutine(EjectWrongObject(args));
             return;
-        }
 
         // Correct object placed
         isUnlocked = true;
 
-        // Remove the obstruction (Secrets / Doors and Keys)
         if (obstruction != null)
             obstruction.SetActive(false);
 
-        // Reveal the secret content
         if (secret != null)
             secret.SetActive(true);
 
-        // Notify the game manager
         EscapeRoomManager manager = FindFirstObjectByType<EscapeRoomManager>();
         if (manager != null)
             manager.OnGateUnlocked();
     }
 
-    void OnObjectRemoved(SelectExitEventArgs args)
-    {
-        // Don't allow removing once unlocked
-        // The object stays locked in the socket
-    }
-
-    System.Collections.IEnumerator EjectWrongObject(SelectEnterEventArgs args)
-    {
-        yield return new WaitForSeconds(0.1f);
-
-        if (socketInteractor.hasSelection)
-        {
-            // Force the socket to release the wrong object
-            var interactable = socketInteractor.firstInteractableSelected;
-            if (interactable != null && interactable.transform.gameObject != acceptedClue)
-            {
-                socketInteractor.interactionManager.CancelInteractorSelection((IXRSelectInteractor)socketInteractor);
-            }
-        }
-    }
-
     public bool IsUnlocked()
     {
         return isUnlocked;
+    }
+}
+
+// Filter class that prevents wrong objects from even entering the socket
+public class XRSocketFilter : IXRHoverFilter, IXRSelectFilter
+{
+    private GateSocket gateSocket;
+
+    public XRSocketFilter(GateSocket socket)
+    {
+        gateSocket = socket;
+    }
+
+    public bool canProcess => true;
+
+    public bool Process(IXRHoverInteractor interactor, IXRHoverInteractable interactable)
+    {
+        return gateSocket.CanSocketAccept(interactable);
+    }
+
+    public bool Process(IXRSelectInteractor interactor, IXRSelectInteractable interactable)
+    {
+        return gateSocket.CanSocketAccept(interactable);
     }
 }
