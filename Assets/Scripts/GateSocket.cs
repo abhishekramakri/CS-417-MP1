@@ -30,7 +30,7 @@ public class GateSocket : MonoBehaviour
     // Called by XRI before allowing a hover — reject wrong objects early
     public bool CanSocketAccept(IXRInteractable interactable)
     {
-        if (isUnlocked) return false;
+        if (isUnlocked) return interactable.transform.gameObject == acceptedClue;
         return interactable.transform.gameObject == acceptedClue;
     }
 
